@@ -1,81 +1,114 @@
-# step5.py
-from bs4 import BeautifulSoup
 import json
+import os
+from pymongo import MongoClient
+from bson.objectid import ObjectId
 
-def extract_property_info(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
-    
-    # Extract from script tag
-    script_tag = soup.find('script', string=lambda t: 'var digitalData' in str(t))
-    
-    if not script_tag:
-        return None
-        
-    script_content = script_tag.string
-    json_str = script_content.split('var digitalData = ')[1].split(';')[0]
-    data = json.loads(json_str)
-    
-    property_info = data['page']['pageInfo']['property']
-    
-    # Extract FAQ schema
-    faq_script = soup.find('script', type='application/ld+json')
-    faq_data = json.loads(faq_script.string)
-    faqs = [{'question': q['name'], 'answer': q['acceptedAnswer']['text']} 
-            for q in faq_data[-1]['mainEntity']]
-    
-    # Extract inspection times from schema
-    inspection_events = [event for event in faq_data if event['@type'] == 'Event']
-    inspection_times = []
-    
-    for event in inspection_events:
-        if 'Inspection' in event['name']:
-            inspection_times.append({
-                'date': event['startDate'].split('T')[0],
-                'time': f"{event['startDate'].split('T')[1]} - {event['endDate'].split('T')[1]}"
-            })
-    
-    # Extract additional details
-    breadcrumbs = []
-    breadcrumb_list = next((item for item in faq_data if item['@type'] == 'BreadcrumbList'), None)
-    if breadcrumb_list:
-        breadcrumbs = [item['name'] for item in breadcrumb_list['itemListElement']]
-    
-    result = {
-        'address': property_info['address'],
-        'price': property_info['price'],
-        'bedrooms': property_info['bedrooms'],
-        'bathrooms': property_info['bathrooms'],
-        'parking': property_info['parking'],
-        'land_area': f"{property_info['landArea']} sqm",
-        'building_size': f"{property_info['internalArea']} sqm",
-        'agency': property_info['agency'],
-        'agents': property_info['agentNames'].split(', '),
-        'sale_method': property_info['saleMethod'],
-        'auction_date': '08/02/2025 at 9:00AM',
-        'inspection_times': inspection_times,
-        'energy_efficiency': '2 stars',
-        'features': ['Energy Efficiency Rating'],
-        'images': property_info['images'],
-        'description': '4 bedroom house for Sale at 7 Armfield Place, Chisholm ACT 2905.',
-        'faqs': faqs,
-        'coordinates': {
-            'latitude': -35.425788,
-            'longitude': 149.1289621
-        },
-        'breadcrumbs': breadcrumbs,
-        'property_id': property_info['propertyId'],
-        'listing_date': property_info['dateListed'],
-        'days_listed': property_info['daysListed'],
-        'has_floorplan': property_info['hasFloorplan'],
-        'floorplan_count': property_info['floorPlansCount'],
-        'photo_count': property_info['photoCount']
+# Đường dẫn tới file đầu vào và đầu ra
+temp_input_path = os.path.join('..', 'data', 'temp_step4.json')
+output_path = os.path.join('..', 'data', 'step4_finaljson')
+
+# Kết nối với MongoDB
+try:
+    client = MongoClient('mongodb+srv://khoilh7705:0333503352Lhk%40@khoilh7705.xdst8xm.mongodb.net/')
+    db = client['real_estate_db']
+    properties_collection = db['properties']
+    agencies_collection = db['agencies']
+    agents_collection = db['agents']
+    images_collection = db['images']
+    schools_collection = db['schools']
+except Exception as e:
+    print(f"Không thể kết nối với MongoDB: {e}")
+    exit()
+
+# Đọc file JSON từ Step 4 tạm thời
+try:
+    with open(temp_input_path, 'r', encoding='utf-8') as file:
+        temp_data = json.load(file)
+except FileNotFoundError:
+    print(f"Không tìm thấy file {temp_input_path}")
+    exit()
+except json.JSONDecodeError:
+    print(f"Lỗi khi phân tích cú pháp file {temp_input_path}")
+    exit()
+
+# Thêm agency vào collection agencies
+agency_id = ObjectId()
+agency_data = {
+    "agencyId": temp_data.get('agencyid', 'TEMP_AGENCY_ID'),
+    "name": "Luton Properties Tuggeranong",
+    "contactDetails": "02 61763448",
+    "isArchived": False,
+    "logo": "https://rimh2.domainstatic.com.au/KatbtKOyhgAN9pZ3GvSBFhJ3W68=/filters:format(png):quality(80):no_upscale()/https://images.domain.com.au/img/Agencys/10312/searchlogo_10312.jpeg?date=638728801327769249",
+    "banner": "https://rimh2.domainstatic.com.au/O79poanDssL4f_qNu4mM_ar9W9U=/filters:format(png):quality(80):no_upscale()/https://images.domain.com.au/img/Agencys/10312/banner_10312.jpeg?date=638728801327769237",
+    "logoSmall": "https://rimh2.domainstatic.com.au/KatbtKOyhgAN9pZ3GvSBFhJ3W68=/filters:format(png):quality(80):no_upscale()/https://images.domain.com.au/img/Agencys/10312/searchlogo_10312.jpeg?date=638728801327769249",
+    "profileUrl": "lutonpropertiestuggeranong-10312",
+    "website": "http://www.luton.com.au/",
+    "_id": agency_id
+}
+agencies_collection.insert_one(agency_data)
+
+# Thêm agents vào collection agents
+agent_ids = []
+agent_data_list = [
+    {
+        "agentId": "1884714",
+        "email": "kelsey.tracey@luton.com.au",
+        "firstName": "Kelsey",
+        "lastName": "Tracey",
+        "phoneNumber": "0414 422 824",
+        "isActiveProfilePage": True,
+        "photo": "https://rimh2.domainstatic.com.au/VMjcup7r19YmwYavOHejaAXkS_U=/filters:format(png):quality(80):no_upscale()/https://images.domain.com.au/img/10312/contact_1884714.jpeg?date=638727332779100000",
+        "profileUrl": "https://www.domain.com.au/real-estate-agent/kelsey-tracey-1884714"
+    },
+    {
+        "agentId": "1541777",
+        "email": "michael.martin@luton.com.au",
+        "firstName": "Michael",
+        "lastName": "Martin",
+        "phoneNumber": "0411748805",
+        "isActiveProfilePage": True,
+        "photo": "https://rimh2.domainstatic.com.au/0_a4UNChiY6gmw8FpVsBanqeHqQ=/filters:format(png):quality(80):no_upscale()/https://images.domain.com.au/img/10312/contact_1894318.jpeg?date=638728004242500000",
+        "profileUrl": "https://www.domain.com.au/real-estate-agent/michael-martin-1541777"
     }
-    
-    return result
+]
+for agent in agent_data_list:
+    agent_id = ObjectId()
+    agents_collection.insert_one({**agent, "_id": agent_id})
+    agent_ids.append(agent_id)
 
-if __name__ == '__main__':
-    with open('step5.html', 'r', encoding='utf-8') as file:
-        html_content = file.read()
-    
-    property_info = extract_property_info(html_content)
-    print(property_info)
+# Thêm images vào collection images
+image_ids = []
+for image in temp_data.get('images', []):
+    image_id = ObjectId()
+    images_collection.insert_one({**image, "_id": image_id})
+    image_ids.append(image_id)
+
+# Thêm schools vào collection schools
+school_ids = []
+for school in temp_data.get('schools', []):
+    school_id = ObjectId()
+    schools_collection.insert_one({**school, "_id": school_id})
+    school_ids.append(school_id)
+
+# Chuyển đổi dữ liệu sang định dạng cuối cùng
+final_data = {
+    **{k: v for k, v in temp_data.items() if k not in ['agencyid', 'agentid', 'imageid', 'schoolid']},
+    'agencyid': agency_id,
+    'agentid': agent_ids,
+    'imageid': image_ids,
+    'schoolid': school_ids
+}
+
+# Lưu dữ liệu vào collection properties
+properties_collection.insert_one(final_data)
+
+# Lưu dữ liệu vào file JSON cuối cùng
+with open(output_path, 'w', encoding='utf-8') as file:
+    final_data_serializable = final_data.copy()
+    final_data_serializable['agencyid'] = str(final_data['agencyid'])
+    final_data_serializable['agentid'] = [str(id) for id in final_data['agentid']]
+    final_data_serializable['imageid'] = [str(id) for id in final_data['imageid']]
+    final_data_serializable['schoolid'] = [str(id) for id in final_data['schoolid']]
+    json.dump(final_data_serializable, file, indent=4)
+
+print(f"Dữ liệu đã được đẩy vào MongoDB và lưu vào {output_path} tại {05:57 PM +07, July 20, 2025}")
