@@ -1,6 +1,6 @@
 # Real Estate Data Processor
 
-This project processes real estate data from HTML files to structured JSON data and stores it in MongoDB.
+A Python-based project to scrape and process real estate data from HTML files, transform it into structured JSON, and store it in MongoDB.
 
 ## Project Structure
 realestate-parser/
@@ -22,9 +22,16 @@ realestate-parser/
 3. `step3_mapped.json` - Mapped structured data (from map_step3.py)
 4. `step4_final.json` - Final transformed data (from transform_step4.py)
 
-## Setup Instructions
+## Prerequisites
+- Python 3.8+
+- MongoDB (local or Atlas)
+- Git (optional for version control)
 
-1. Clone the repository
+## Installation
+1. Clone the repository (if using Git):
+   ```bash
+   git clone <https://github.com/noteart13/dataProcessorHTML_Project>
+   cd realestate-parser
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
